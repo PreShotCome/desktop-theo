@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { brain } from '../data/brain'
@@ -39,44 +39,74 @@ function fibDir(i: number, n: number): THREE.Vector3 {
   )
 }
 
-// Clean label for the section list ("Tools — memory" -> group + name handled in UI).
 function cleanLabel(label: string): string {
   return label.replace(/^Tools — /, '')
 }
-function isTool(id: string): boolean {
-  return id.startsWith('toolgroup:')
+
+// Meaningful super-groups, each mapped to a region of the brain.
+type GroupKey = 'core' | 'principles' | 'voice' | 'skills' | 'research' | 'memory' | 'tools'
+function groupOf(id: string): GroupKey {
+  if (id === 'core') return 'core'
+  if (id === 'principles') return 'principles'
+  if (id === 'voice') return 'voice'
+  if (id === 'skills') return 'skills'
+  if (id === 'research') return 'research'
+  if (id === 'memory') return 'memory'
+  return 'tools'
+}
+// Anchor direction in normalized ellipsoid space (x=L/R, y=front/back, z=up/down).
+const ANCHOR: Record<GroupKey, THREE.Vector3> = {
+  core: new THREE.Vector3(0.0, 0.0, 0.0),
+  principles: new THREE.Vector3(-0.12, 0.28, 0.62),
+  voice: new THREE.Vector3(-0.62, 0.32, 0.08),
+  skills: new THREE.Vector3(0.2, 0.66, 0.18),
+  memory: new THREE.Vector3(0.0, -0.32, -0.56),
+  research: new THREE.Vector3(-0.18, -0.66, 0.12),
+  tools: new THREE.Vector3(0.58, -0.04, 0.0)
+}
+const GSPREAD: Record<GroupKey, number> = {
+  core: 0.1,
+  principles: 0.16,
+  voice: 0.22,
+  skills: 0.2,
+  memory: 0.18,
+  research: 0.24,
+  tools: 0.5
 }
 
-const VERT = `
-  attribute float size;
-  attribute vec3 acolor;
-  varying vec3 vColor;
-  void main() {
-    vColor = acolor;
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = size * (270.0 / -mv.z);
-    gl_Position = projectionMatrix * mv;
-  }
-`
-const FRAG = `
-  varying vec3 vColor;
-  void main() {
-    float d = length(gl_PointCoord - vec2(0.5));
-    if (d > 0.5) discard;
-    float a = smoothstep(0.5, 0.0, d);
-    gl_FragColor = vec4(vColor, a);
-  }
-`
+type Sel = { type: 'none' } | { type: 'section'; i: number } | { type: 'tools' }
 
 function BrainSection(): JSX.Element {
   const stageRef = useRef<HTMLDivElement>(null)
-  const applyRef = useRef<(s: number | null) => void>(() => {})
-  const [sel, setSel] = useState<number | null>(null)
+  const applyRef = useRef<(s: Sel) => void>(() => {})
+  const [sel, setSel] = useState<Sel>({ type: 'none' })
+  const [toolsOpen, setToolsOpen] = useState(false)
 
   const cats = brain.categories
   const N = cats.length
 
-  // Drive the 3D highlight whenever the selection changes (from list or canvas).
+  // List structure: non-tool sections inline, all tool sections under one group.
+  const { items, toolMembers, toolNodeCount } = useMemo(() => {
+    const toolMembers = cats
+      .map((c, i) => ({ c, i }))
+      .filter((x) => groupOf(x.c.id) === 'tools')
+      .map((x) => ({ index: x.i, label: cleanLabel(x.c.label), count: x.c.nodes.length }))
+    const toolNodeCount = toolMembers.reduce((n, m) => n + m.count, 0)
+    const items: ({ kind: 'section'; index: number } | { kind: 'tools' })[] = []
+    let inserted = false
+    cats.forEach((c, i) => {
+      if (groupOf(c.id) === 'tools') {
+        if (!inserted) {
+          items.push({ kind: 'tools' })
+          inserted = true
+        }
+      } else {
+        items.push({ kind: 'section', index: i })
+      }
+    })
+    return { items, toolMembers, toolNodeCount }
+  }, [])
+
   useEffect(() => {
     applyRef.current(sel)
   }, [sel])
@@ -85,14 +115,13 @@ function BrainSection(): JSX.Element {
     const stage = stageRef.current
     if (!stage) return
 
-    // Brain-shaped volume (ellipsoid: width, depth, height).
     const A = 50
     const B = 64
     const C = 44
 
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 4000)
-    camera.position.set(0, 10, 190)
+    camera.position.set(0, 10, 195)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -111,7 +140,14 @@ function BrainSection(): JSX.Element {
     const root = new THREE.Group()
     scene.add(root)
 
-    // ---- build point cloud: one light per node, clustered by section ----
+    // group members (stable order) for region layout
+    const groupMembers: Record<string, number[]> = {}
+    cats.forEach((c, i) => {
+      const g = groupOf(c.id)
+      ;(groupMembers[g] ||= []).push(i)
+    })
+    const toolIdx = new Set(groupMembers['tools'] || [])
+
     const centroids: THREE.Vector3[] = []
     const positions: number[] = []
     const colors: number[] = []
@@ -120,16 +156,17 @@ function BrainSection(): JSX.Element {
     const cat01 = cats.map((_, i) => catRGB(i, N).map((v) => v / 255) as number[])
 
     cats.forEach((cat, i) => {
-      // Section centroid distributed through the brain volume (two lobes).
-      const dir = fibDir(i, N)
-      const rng = mulberry32(i * 2654435761 + 11)
-      const rf = 0.32 + rng() * 0.55
-      const cen = new THREE.Vector3(dir.x * A, dir.y * B, dir.z * C).multiplyScalar(rf)
-      // hemisphere push (longitudinal fissure)
-      cen.x += Math.sign(cen.x || 1) * 6
+      const g = groupOf(cat.id)
+      const members = groupMembers[g]
+      const li = members.indexOf(i)
+      const dir = fibDir(li, members.length)
+      const cn = ANCHOR[g].clone().add(dir.multiplyScalar(GSPREAD[g]))
+      const cen = new THREE.Vector3(cn.x * A, cn.y * B, cn.z * C).multiplyScalar(0.9)
+      cen.x += Math.sign(cen.x || 1) * 5 // longitudinal fissure
       centroids.push(cen)
 
-      const spread = 7 + Math.min(cat.nodes.length, 16) * 0.7
+      const rng = mulberry32(i * 2654435761 + 11)
+      const spread = 6 + Math.min(cat.nodes.length, 16) * 0.6
       cat.nodes.forEach(() => {
         const off = new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5)
           .normalize()
@@ -144,16 +181,33 @@ function BrainSection(): JSX.Element {
 
     const count = pointCat.length
     const geo = new THREE.BufferGeometry()
-    const posAttr = new THREE.Float32BufferAttribute(positions, 3)
     const colAttr = new THREE.Float32BufferAttribute(colors, 3)
     const sizeAttr = new THREE.Float32BufferAttribute(sizes, 1)
-    geo.setAttribute('position', posAttr)
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     geo.setAttribute('acolor', colAttr)
     geo.setAttribute('size', sizeAttr)
 
     const mat = new THREE.ShaderMaterial({
-      vertexShader: VERT,
-      fragmentShader: FRAG,
+      vertexShader: `
+        attribute float size;
+        attribute vec3 acolor;
+        varying vec3 vColor;
+        void main() {
+          vColor = acolor;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (270.0 / -mv.z);
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        void main() {
+          float d = length(gl_PointCoord - vec2(0.5));
+          if (d > 0.5) discard;
+          float a = smoothstep(0.5, 0.0, d);
+          gl_FragColor = vec4(vColor, a);
+        }
+      `,
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending
@@ -161,7 +215,6 @@ function BrainSection(): JSX.Element {
     const points = new THREE.Points(geo, mat)
     root.add(points)
 
-    // subtle containment frame (scales with zoom)
     const frame = new THREE.LineSegments(
       new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1, 3)),
       new THREE.LineBasicMaterial({
@@ -177,7 +230,22 @@ function BrainSection(): JSX.Element {
 
     // ---- highlight ----
     const desiredTarget = new THREE.Vector3(0, 0, 0)
-    function applyHighlight(s: number | null): void {
+    const toolsCenter = new THREE.Vector3(
+      ANCHOR.tools.x * A,
+      ANCHOR.tools.y * B,
+      ANCHOR.tools.z * C
+    ).multiplyScalar(0.9)
+
+    function applyHighlight(s: Sel): void {
+      let set: Set<number> | null = null
+      const target = new THREE.Vector3(0, 0, 0)
+      if (s.type === 'section') {
+        set = new Set([s.i])
+        target.copy(centroids[s.i])
+      } else if (s.type === 'tools') {
+        set = toolIdx
+        target.copy(toolsCenter)
+      }
       const col = colAttr.array as Float32Array
       const sz = sizeAttr.array as Float32Array
       for (let p = 0; p < count; p++) {
@@ -185,14 +253,14 @@ function BrainSection(): JSX.Element {
         const base = cat01[ci]
         let f: number
         let size: number
-        if (s === null) {
+        if (set === null) {
           f = 0.72
           size = 7
-        } else if (ci === s) {
+        } else if (set.has(ci)) {
           f = 1.6
           size = 13
         } else {
-          f = 0.08
+          f = 0.07
           size = 4
         }
         col[p * 3] = base[0] * f
@@ -202,10 +270,10 @@ function BrainSection(): JSX.Element {
       }
       colAttr.needsUpdate = true
       sizeAttr.needsUpdate = true
-      desiredTarget.copy(s === null ? new THREE.Vector3(0, 0, 0) : centroids[s])
+      desiredTarget.copy(target)
     }
     applyRef.current = applyHighlight
-    applyHighlight(null)
+    applyHighlight({ type: 'none' })
 
     // ---- click a region -> select its section ----
     const raycaster = new THREE.Raycaster()
@@ -213,7 +281,6 @@ function BrainSection(): JSX.Element {
     const ptr = new THREE.Vector2()
     const dom = renderer.domElement
     dom.style.cursor = 'grab'
-
     function onClick(e: PointerEvent): void {
       const rect = dom.getBoundingClientRect()
       ptr.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
@@ -222,12 +289,12 @@ function BrainSection(): JSX.Element {
       const hits = raycaster.intersectObject(points, false)
       if (hits.length && hits[0].index != null) {
         const ci = pointCat[hits[0].index]
-        setSel((prev) => (prev === ci ? null : ci))
+        if (toolIdx.has(ci)) setToolsOpen(true)
+        setSel((prev) => (prev.type === 'section' && prev.i === ci ? { type: 'none' } : { type: 'section', i: ci }))
       }
     }
     dom.addEventListener('pointerdown', onClick)
 
-    // ---- resize ----
     function resize(): void {
       const w = stage!.clientWidth
       const h = stage!.clientHeight
@@ -264,6 +331,23 @@ function BrainSection(): JSX.Element {
   }, [])
 
   const nodeCount = cats.reduce((n, c) => n + c.nodes.length, 0)
+  const isSecActive = (i: number): boolean => sel.type === 'section' && sel.i === i
+
+  function ItemList({ idx }: { idx: number }): JSX.Element {
+    return (
+      <ul className="brain-items">
+        {cats[idx].nodes.map((node) => (
+          <li key={node.id} className="brain-item">
+            {node.label}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  function selSection(i: number): void {
+    setSel(isSecActive(i) ? { type: 'none' } : { type: 'section', i })
+  }
 
   return (
     <div className="brain-wrap">
@@ -274,37 +358,61 @@ function BrainSection(): JSX.Element {
             {nodeCount} nodes · {N} sections · v{brain.identity_version}
           </div>
           <button
-            className={`brain-all${sel === null ? ' active' : ''}`}
-            onClick={() => setSel(null)}
+            className={`brain-all${sel.type === 'none' ? ' active' : ''}`}
+            onClick={() => setSel({ type: 'none' })}
           >
             ◯ Show whole brain
           </button>
         </div>
         <div className="brain-sec-list">
-          {cats.map((cat, i) => (
-            <div key={cat.id}>
-              <button
-                className={`brain-sec-row${sel === i ? ' active' : ''}`}
-                onClick={() => setSel(sel === i ? null : i)}
-              >
-                <span className="brain-dot" style={{ background: catCss(i, N) }} />
-                <span className="brain-sec-label">
-                  {isTool(cat.id) && <span className="brain-sec-pre">tool · </span>}
-                  {cleanLabel(cat.label)}
-                </span>
-                <span className="brain-sec-count">{cat.nodes.length}</span>
-              </button>
-              {sel === i && (
-                <ul className="brain-items">
-                  {cat.nodes.map((node) => (
-                    <li key={node.id} className="brain-item">
-                      {node.label}
-                    </li>
+          {items.map((it) =>
+            it.kind === 'section' ? (
+              <div key={cats[it.index].id}>
+                <button
+                  className={`brain-sec-row${isSecActive(it.index) ? ' active' : ''}`}
+                  onClick={() => selSection(it.index)}
+                >
+                  <span className="brain-dot" style={{ background: catCss(it.index, N) }} />
+                  <span className="brain-sec-label">{cats[it.index].label}</span>
+                  <span className="brain-sec-count">{cats[it.index].nodes.length}</span>
+                </button>
+                {isSecActive(it.index) && <ItemList idx={it.index} />}
+              </div>
+            ) : (
+              <div key="tools-group">
+                <button
+                  className={`brain-sec-row${sel.type === 'tools' ? ' active' : ''}`}
+                  onClick={() => {
+                    if (sel.type === 'tools') {
+                      setSel({ type: 'none' })
+                      setToolsOpen(false)
+                    } else {
+                      setSel({ type: 'tools' })
+                      setToolsOpen(true)
+                    }
+                  }}
+                >
+                  <span className={`brain-chevron${toolsOpen ? ' open' : ''}`}>▶</span>
+                  <span className="brain-sec-label">Tools</span>
+                  <span className="brain-sec-count">{toolNodeCount}</span>
+                </button>
+                {toolsOpen &&
+                  toolMembers.map((m) => (
+                    <div key={cats[m.index].id}>
+                      <button
+                        className={`brain-sec-row sub${isSecActive(m.index) ? ' active' : ''}`}
+                        onClick={() => selSection(m.index)}
+                      >
+                        <span className="brain-dot" style={{ background: catCss(m.index, N) }} />
+                        <span className="brain-sec-label">{m.label}</span>
+                        <span className="brain-sec-count">{m.count}</span>
+                      </button>
+                      {isSecActive(m.index) && <ItemList idx={m.index} />}
+                    </div>
                   ))}
-                </ul>
-              )}
-            </div>
-          ))}
+              </div>
+            )
+          )}
         </div>
       </aside>
 
