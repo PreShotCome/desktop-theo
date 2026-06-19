@@ -43,7 +43,7 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     title: 'Theo Desktop',
-    backgroundColor: '#0a0e0f',
+    backgroundColor: '#0b0d12',
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

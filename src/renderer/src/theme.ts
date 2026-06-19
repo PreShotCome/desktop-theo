@@ -1,16 +1,17 @@
-// Theo desktop palette — continues the "TerminalTron" aesthetic from the
-// existing Flutter chat app (the `TS` palette: dark terminal, cyan accent).
-// Kept in one place so the look stays consistent as sections are added.
+// Theo desktop palette — "Modern Glass": dark gradient backdrop, frosted
+// translucent panels, a teal->violet accent gradient. Mirrors the CSS custom
+// properties in styles.css; kept here for any inline/JS use as sections grow.
 export const TS = {
-  bg: '#0a0e0f',
-  panel: '#0f1517',
-  panelAlt: '#121a1d',
-  border: '#1d2a2e',
-  text: '#d6e7e5',
-  textDim: '#7d9794',
+  bg: '#0b0d12',
+  glass: 'rgba(20, 24, 33, 0.55)',
+  glassStrong: 'rgba(24, 29, 40, 0.72)',
+  border: 'rgba(255, 255, 255, 0.08)',
+  text: '#e6ebf2',
+  textDim: '#8b95a7',
   accent: '#36e0c8',
-  accentDim: '#1c8678',
-  danger: '#ff5d6c',
+  accent2: '#8b5cf6',
+  accentGrad: 'linear-gradient(135deg, #36e0c8 0%, #8b5cf6 100%)',
+  danger: '#ff6b78',
   warn: '#ffcc66'
 } as const
 

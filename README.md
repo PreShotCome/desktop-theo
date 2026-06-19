@@ -34,7 +34,7 @@ src/
     index.html
     src/
       App.tsx                # shell: sidebar + section switch
-      theme.ts               # TS palette (TerminalTron) + Section type
+      theme.ts               # TS palette (Modern Glass) + Section type
       styles.css
       components/Sidebar.tsx
       sections/              # Chat / Code / Brain / Settings

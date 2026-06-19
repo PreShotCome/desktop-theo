@@ -1,13 +1,27 @@
 :root {
-  --bg: #0a0e0f;
-  --panel: #0f1517;
-  --panel-alt: #121a1d;
-  --border: #1d2a2e;
-  --text: #d6e7e5;
-  --text-dim: #7d9794;
+  --bg: #0b0d12;
+  --text: #e6ebf2;
+  --text-dim: #8b95a7;
+
+  /* glass surfaces */
+  --glass: rgba(20, 24, 33, 0.55);
+  --glass-strong: rgba(24, 29, 40, 0.72);
+  --glass-hover: rgba(40, 47, 63, 0.55);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-bright: rgba(255, 255, 255, 0.14);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.38);
+
+  /* accent gradient: teal -> violet */
   --accent: #36e0c8;
-  --accent-dim: #1c8678;
-  --danger: #ff5d6c;
+  --accent-2: #8b5cf6;
+  --accent-grad: linear-gradient(135deg, #36e0c8 0%, #8b5cf6 100%);
+  --accent-grad-soft: linear-gradient(
+    135deg,
+    rgba(54, 224, 200, 0.18) 0%,
+    rgba(139, 92, 246, 0.18) 100%
+  );
+
+  --danger: #ff6b78;
   --warn: #ffcc66;
 }
 
@@ -23,12 +37,19 @@ body,
 }
 
 body {
-  background: var(--bg);
   color: var(--text);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   user-select: none;
+
+  /* layered gradient backdrop — what the frosted panels blur over */
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, rgba(54, 224, 200, 0.16), transparent 60%),
+    radial-gradient(900px 700px at 100% 110%, rgba(139, 92, 246, 0.18), transparent 55%),
+    radial-gradient(700px 500px at 85% 0%, rgba(64, 120, 255, 0.1), transparent 60%);
+  background-attachment: fixed;
 }
 
 code,
@@ -43,68 +64,91 @@ textarea,
 .app {
   display: flex;
   height: 100%;
+  padding: 14px;
+  gap: 14px;
 }
 
 .sidebar {
-  width: 220px;
+  width: 222px;
   flex-shrink: 0;
-  background: var(--panel);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 .brand {
-  padding: 20px 18px 16px;
+  padding: 22px 20px 18px;
   border-bottom: 1px solid var(--border);
 }
 
 .brand-name {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--accent);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  width: fit-content;
 }
 
 .brand-sub {
   font-size: 11px;
   color: var(--text-dim);
-  margin-top: 3px;
+  margin-top: 4px;
   text-transform: uppercase;
-  letter-spacing: 1.2px;
+  letter-spacing: 1.4px;
 }
 
 .nav {
   flex: 1;
-  padding: 10px 8px;
+  padding: 12px 10px;
 }
 
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
   padding: 11px 14px;
-  margin-bottom: 4px;
-  border: none;
-  border-radius: 8px;
+  margin-bottom: 5px;
+  border: 1px solid transparent;
+  border-radius: 12px;
   background: transparent;
   color: var(--text-dim);
   font-size: 14px;
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .nav-item:hover {
-  background: var(--panel-alt);
+  background: var(--glass-hover);
   color: var(--text);
 }
 
 .nav-item.active {
-  background: var(--panel-alt);
-  color: var(--accent);
-  box-shadow: inset 2px 0 0 var(--accent);
+  background: var(--accent-grad-soft);
+  border-color: var(--border-bright);
+  color: var(--text);
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent-grad);
 }
 
 .nav-glyph {
@@ -114,7 +158,7 @@ textarea,
 }
 
 .sidebar-foot {
-  padding: 12px 18px;
+  padding: 14px 20px;
   border-top: 1px solid var(--border);
   font-size: 11px;
   color: var(--text-dim);
@@ -127,28 +171,36 @@ textarea,
   display: flex;
   flex-direction: column;
   min-width: 0;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 .topbar {
-  height: 52px;
+  height: 56px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  padding: 0 24px;
+  padding: 0 26px;
   border-bottom: 1px solid var(--border);
-  background: var(--panel);
+  background: var(--glass-strong);
 }
 
 .topbar h1 {
   font-size: 15px;
   font-weight: 600;
+  letter-spacing: 0.3px;
   margin: 0;
 }
 
 .section {
   flex: 1;
   overflow-y: auto;
-  padding: 28px 32px;
+  padding: 30px 34px;
 }
 
 .placeholder {
@@ -156,14 +208,14 @@ textarea,
 }
 
 .placeholder h2 {
-  font-size: 20px;
-  margin: 0 0 8px;
+  font-size: 22px;
+  margin: 0 0 10px;
   color: var(--text);
 }
 
 .placeholder p {
   color: var(--text-dim);
-  line-height: 1.6;
+  line-height: 1.65;
   margin: 0 0 14px;
 }
 
@@ -172,11 +224,12 @@ textarea,
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--accent);
-  border: 1px solid var(--accent-dim);
+  color: var(--text);
+  background: var(--accent-grad-soft);
+  border: 1px solid var(--border-bright);
   border-radius: 999px;
-  padding: 3px 10px;
-  margin-bottom: 18px;
+  padding: 4px 12px;
+  margin-bottom: 20px;
 }
 
 /* ---- chat -------------------------------------------------------------- */
@@ -190,7 +243,7 @@ textarea,
 .chat-log {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 32px;
+  padding: 26px 34px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -198,30 +251,33 @@ textarea,
 
 .msg {
   max-width: 70%;
-  padding: 11px 15px;
-  border-radius: 12px;
-  line-height: 1.5;
+  padding: 12px 16px;
+  border-radius: 16px;
+  line-height: 1.55;
   user-select: text;
 }
 
 .msg.user {
   align-self: flex-end;
-  background: var(--accent-dim);
-  color: #04110f;
+  background: var(--accent-grad);
+  color: #07140f;
+  border-bottom-right-radius: 5px;
+  font-weight: 500;
 }
 
 .msg.theo {
   align-self: flex-start;
-  background: var(--panel-alt);
+  background: var(--glass-strong);
   border: 1px solid var(--border);
+  border-bottom-left-radius: 5px;
 }
 
 .chat-input {
   display: flex;
   gap: 10px;
-  padding: 16px 24px;
+  padding: 18px 26px;
   border-top: 1px solid var(--border);
-  background: var(--panel);
+  background: var(--glass-strong);
 }
 
 .chat-input input {
@@ -234,35 +290,42 @@ input[type='text'],
 input[type='password'],
 select,
 textarea {
-  background: var(--bg);
+  background: rgba(0, 0, 0, 0.28);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 11px;
   color: var(--text);
-  padding: 10px 12px;
+  padding: 11px 13px;
   font-size: 14px;
   outline: none;
   user-select: text;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--accent-dim);
+  border-color: rgba(54, 224, 200, 0.55);
+  box-shadow: 0 0 0 3px rgba(54, 224, 200, 0.12);
 }
 
 button.btn {
-  background: var(--accent);
-  color: #04110f;
+  background: var(--accent-grad);
+  color: #07140f;
   border: none;
-  border-radius: 8px;
-  padding: 10px 18px;
+  border-radius: 11px;
+  padding: 11px 20px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition: filter 0.15s, transform 0.05s;
 }
 
 button.btn:hover {
   filter: brightness(1.08);
+}
+
+button.btn:active {
+  transform: translateY(1px);
 }
 
 button.btn.ghost {
@@ -282,7 +345,7 @@ button.btn.ghost {
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: var(--text-dim);
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 
 .field input,
@@ -301,4 +364,24 @@ button.btn.ghost {
   height: 320px;
   resize: vertical;
   line-height: 1.5;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+/* ---- scrollbars -------------------------------------------------------- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: padding-box;
 }
