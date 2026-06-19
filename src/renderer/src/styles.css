@@ -367,6 +367,140 @@ button.btn.ghost {
   background: rgba(0, 0, 0, 0.32);
 }
 
+/* ---- brain (3D) -------------------------------------------------------- */
+
+.brain-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.brain-wrap canvas {
+  display: block;
+}
+
+.brain-head {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  pointer-events: none;
+}
+
+.brain-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  width: fit-content;
+}
+
+.brain-stat {
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.4px;
+}
+
+.brain-hint {
+  position: absolute;
+  bottom: 18px;
+  left: 24px;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.4px;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.brain-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  bottom: 20px;
+  width: 340px;
+  padding: 22px 22px 18px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid var(--border-bright);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.brain-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.brain-close:hover {
+  background: var(--glass-hover);
+  color: var(--text);
+}
+
+.brain-panel-cat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  padding-right: 28px;
+}
+
+.brain-panel-count {
+  text-transform: none;
+  letter-spacing: 0.3px;
+}
+
+.brain-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.brain-panel-title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  margin-bottom: 14px;
+  user-select: text;
+}
+
+.brain-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #c2ccd8;
+  white-space: pre-wrap;
+  user-select: text;
+  padding-right: 6px;
+}
+
+.brain-panel-body.dim {
+  color: var(--text-dim);
+}
+
 /* ---- scrollbars -------------------------------------------------------- */
 
 ::-webkit-scrollbar {
