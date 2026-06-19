@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# build output
+out/
+dist/
+release/
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# env / secrets — never commit service-account JSON or tokens
+.env
+.env.*
+firebase-key.json
+*-service-account.json
