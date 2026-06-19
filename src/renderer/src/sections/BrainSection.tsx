@@ -1,18 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { brain, type BrainNode } from '../data/brain'
+import { brain } from '../data/brain'
 
-interface Selected {
-  kind: 'node' | 'hub'
-  category: string
-  color: string
-  label: string
-  body?: string
-  count?: number
+// teal -> violet, in 0..255
+const TEAL = [0x36, 0xe0, 0xc8]
+const VIOLET = [0x8b, 0x5c, 0xf6]
+function catRGB(i: number, n: number): [number, number, number] {
+  const t = n > 1 ? i / (n - 1) : 0
+  return [
+    TEAL[0] + (VIOLET[0] - TEAL[0]) * t,
+    TEAL[1] + (VIOLET[1] - TEAL[1]) * t,
+    TEAL[2] + (VIOLET[2] - TEAL[2]) * t
+  ]
+}
+function catCss(i: number, n: number): string {
+  const c = catRGB(i, n)
+  return `rgb(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])})`
 }
 
-// Deterministic RNG so the layout is stable between launches.
 function mulberry32(seed: number): () => number {
   return function () {
     seed |= 0
@@ -23,211 +29,208 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-// Even point distribution on a sphere — used to place the 40 category hubs.
-function fibSphere(i: number, n: number, r: number): THREE.Vector3 {
+function fibDir(i: number, n: number): THREE.Vector3 {
   const phi = Math.acos(1 - (2 * (i + 0.5)) / n)
   const theta = Math.PI * (1 + Math.sqrt(5)) * i
   return new THREE.Vector3(
     Math.cos(theta) * Math.sin(phi),
     Math.sin(theta) * Math.sin(phi),
     Math.cos(phi)
-  ).multiplyScalar(r)
+  )
 }
 
-// Soft radial sprite used as a cheap, reliable "glow" around each node.
-function makeGlowTexture(): THREE.Texture {
-  const s = 64
-  const c = document.createElement('canvas')
-  c.width = c.height = s
-  const ctx = c.getContext('2d')!
-  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2)
-  g.addColorStop(0, 'rgba(255,255,255,1)')
-  g.addColorStop(0.25, 'rgba(255,255,255,0.55)')
-  g.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, s, s)
-  const tex = new THREE.CanvasTexture(c)
-  tex.needsUpdate = true
-  return tex
+// Clean label for the section list ("Tools — memory" -> group + name handled in UI).
+function cleanLabel(label: string): string {
+  return label.replace(/^Tools — /, '')
 }
+function isTool(id: string): boolean {
+  return id.startsWith('toolgroup:')
+}
+
+const VERT = `
+  attribute float size;
+  attribute vec3 acolor;
+  varying vec3 vColor;
+  void main() {
+    vColor = acolor;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = size * (270.0 / -mv.z);
+    gl_Position = projectionMatrix * mv;
+  }
+`
+const FRAG = `
+  varying vec3 vColor;
+  void main() {
+    float d = length(gl_PointCoord - vec2(0.5));
+    if (d > 0.5) discard;
+    float a = smoothstep(0.5, 0.0, d);
+    gl_FragColor = vec4(vColor, a);
+  }
+`
 
 function BrainSection(): JSX.Element {
-  const mountRef = useRef<HTMLDivElement>(null)
-  const [selected, setSelected] = useState<Selected | null>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const applyRef = useRef<(s: number | null) => void>(() => {})
+  const [sel, setSel] = useState<number | null>(null)
+
+  const cats = brain.categories
+  const N = cats.length
+
+  // Drive the 3D highlight whenever the selection changes (from list or canvas).
+  useEffect(() => {
+    applyRef.current(sel)
+  }, [sel])
 
   useEffect(() => {
-    const mount = mountRef.current
-    if (!mount) return
+    const stage = stageRef.current
+    if (!stage) return
 
-    const teal = new THREE.Color('#36e0c8')
-    const violet = new THREE.Color('#8b5cf6')
-    const glowTex = makeGlowTexture()
+    // Brain-shaped volume (ellipsoid: width, depth, height).
+    const A = 50
+    const B = 64
+    const C = 44
 
     const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000)
-    camera.position.set(0, 14, 185)
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 4000)
+    camera.position.set(0, 10, 190)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setClearColor(0x000000, 0)
-    mount.appendChild(renderer.domElement)
+    stage.appendChild(renderer.domElement)
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.dampingFactor = 0.08
     controls.enablePan = false
-    controls.minDistance = 70
-    controls.maxDistance = 360
+    controls.minDistance = 12
+    controls.maxDistance = 700
     controls.autoRotate = true
-    controls.autoRotateSpeed = 0.45
+    controls.autoRotateSpeed = 0.4
 
     const root = new THREE.Group()
     scene.add(root)
 
-    const clickable: THREE.Mesh[] = []
-    const edgePts: number[] = []
-    const edgeCols: number[] = []
-    const sphereGeo = new THREE.SphereGeometry(1, 16, 16)
-    const cats = brain.categories
-    const N = cats.length
-
-    function addGlow(pos: THREE.Vector3, color: THREE.Color, size: number): void {
-      const mat = new THREE.SpriteMaterial({
-        map: glowTex,
-        color,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        opacity: 0.9
-      })
-      const s = new THREE.Sprite(mat)
-      s.position.copy(pos)
-      s.scale.setScalar(size)
-      root.add(s)
-    }
-
-    // Core
-    const coreColor = new THREE.Color('#bfe9ff')
-    const core = new THREE.Mesh(sphereGeo, new THREE.MeshBasicMaterial({ color: coreColor }))
-    core.scale.setScalar(3.4)
-    root.add(core)
-    addGlow(new THREE.Vector3(0, 0, 0), coreColor, 26)
+    // ---- build point cloud: one light per node, clustered by section ----
+    const centroids: THREE.Vector3[] = []
+    const positions: number[] = []
+    const colors: number[] = []
+    const sizes: number[] = []
+    const pointCat: number[] = []
+    const cat01 = cats.map((_, i) => catRGB(i, N).map((v) => v / 255) as number[])
 
     cats.forEach((cat, i) => {
-      const t = N > 1 ? i / (N - 1) : 0
-      const color = teal.clone().lerp(violet, t)
-      const hub = fibSphere(i, N, 62)
-      const rng = mulberry32(i * 9173 + 7)
+      // Section centroid distributed through the brain volume (two lobes).
+      const dir = fibDir(i, N)
+      const rng = mulberry32(i * 2654435761 + 11)
+      const rf = 0.32 + rng() * 0.55
+      const cen = new THREE.Vector3(dir.x * A, dir.y * B, dir.z * C).multiplyScalar(rf)
+      // hemisphere push (longitudinal fissure)
+      cen.x += Math.sign(cen.x || 1) * 6
+      centroids.push(cen)
 
-      // hub
-      const hubMesh = new THREE.Mesh(sphereGeo, new THREE.MeshBasicMaterial({ color }))
-      hubMesh.position.copy(hub)
-      hubMesh.scale.setScalar(2.0)
-      hubMesh.userData = {
-        kind: 'hub',
-        category: cat.label,
-        color: '#' + color.getHexString(),
-        label: cat.label,
-        count: cat.nodes.length
-      }
-      root.add(hubMesh)
-      clickable.push(hubMesh)
-      addGlow(hub, color, 14)
-
-      // edge core -> hub
-      edgePts.push(0, 0, 0, hub.x, hub.y, hub.z)
-      edgeCols.push(coreColor.r, coreColor.g, coreColor.b, color.r, color.g, color.b)
-
-      // nodes around the hub
-      const spread = 9 + Math.min(cat.nodes.length, 12) * 1.6
-      cat.nodes.forEach((node: BrainNode) => {
-        const dir = new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5).normalize()
-        const dist = spread * (0.45 + rng() * 0.75)
-        const p = hub.clone().add(dir.multiplyScalar(dist))
-        const nodeColor = color.clone().lerp(new THREE.Color('#ffffff'), 0.18 + rng() * 0.2)
-
-        const m = new THREE.Mesh(sphereGeo, new THREE.MeshBasicMaterial({ color: nodeColor }))
-        m.position.copy(p)
-        m.scale.setScalar(1.15)
-        m.userData = {
-          kind: 'node',
-          category: cat.label,
-          color: '#' + nodeColor.getHexString(),
-          label: node.label,
-          body: node.body
-        }
-        root.add(m)
-        clickable.push(m)
-        addGlow(p, nodeColor, 5.5)
-
-        edgePts.push(hub.x, hub.y, hub.z, p.x, p.y, p.z)
-        edgeCols.push(color.r, color.g, color.b, nodeColor.r, nodeColor.g, nodeColor.b)
+      const spread = 7 + Math.min(cat.nodes.length, 16) * 0.7
+      cat.nodes.forEach(() => {
+        const off = new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5)
+          .normalize()
+          .multiplyScalar(spread * (0.4 + rng() * 0.8))
+        const p = cen.clone().add(off)
+        positions.push(p.x, p.y, p.z)
+        colors.push(cat01[i][0], cat01[i][1], cat01[i][2])
+        sizes.push(7)
+        pointCat.push(i)
       })
     })
 
-    // edges
-    const edgeGeo = new THREE.BufferGeometry()
-    edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(edgePts, 3))
-    edgeGeo.setAttribute('color', new THREE.Float32BufferAttribute(edgeCols, 3))
-    const edges = new THREE.LineSegments(
-      edgeGeo,
+    const count = pointCat.length
+    const geo = new THREE.BufferGeometry()
+    const posAttr = new THREE.Float32BufferAttribute(positions, 3)
+    const colAttr = new THREE.Float32BufferAttribute(colors, 3)
+    const sizeAttr = new THREE.Float32BufferAttribute(sizes, 1)
+    geo.setAttribute('position', posAttr)
+    geo.setAttribute('acolor', colAttr)
+    geo.setAttribute('size', sizeAttr)
+
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: VERT,
+      fragmentShader: FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    })
+    const points = new THREE.Points(geo, mat)
+    root.add(points)
+
+    // subtle containment frame (scales with zoom)
+    const frame = new THREE.LineSegments(
+      new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1, 3)),
       new THREE.LineBasicMaterial({
-        vertexColors: true,
+        color: new THREE.Color('#36e0c8'),
         transparent: true,
-        opacity: 0.16,
+        opacity: 0.05,
         blending: THREE.AdditiveBlending,
         depthWrite: false
       })
     )
-    root.add(edges)
+    frame.scale.set(A * 1.18, B * 1.18, C * 1.18)
+    root.add(frame)
 
-    // ---- interaction ----
-    const raycaster = new THREE.Raycaster()
-    raycaster.params.Line = { threshold: 0 } as THREE.Raycaster['params']['Line']
-    const pointer = new THREE.Vector2()
-    let hovered: THREE.Mesh | null = null
-    const dom = renderer.domElement
-
-    function setPointer(e: PointerEvent): void {
-      const rect = dom.getBoundingClientRect()
-      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-    }
-
-    function pick(): THREE.Mesh | null {
-      raycaster.setFromCamera(pointer, camera)
-      const hits = raycaster.intersectObjects(clickable, false)
-      return hits.length ? (hits[0].object as THREE.Mesh) : null
-    }
-
-    function onMove(e: PointerEvent): void {
-      setPointer(e)
-      const hit = pick()
-      if (hit !== hovered) {
-        if (hovered) hovered.scale.multiplyScalar(1 / 1.6)
-        hovered = hit
-        if (hovered) hovered.scale.multiplyScalar(1.6)
-        dom.style.cursor = hovered ? 'pointer' : 'grab'
+    // ---- highlight ----
+    const desiredTarget = new THREE.Vector3(0, 0, 0)
+    function applyHighlight(s: number | null): void {
+      const col = colAttr.array as Float32Array
+      const sz = sizeAttr.array as Float32Array
+      for (let p = 0; p < count; p++) {
+        const ci = pointCat[p]
+        const base = cat01[ci]
+        let f: number
+        let size: number
+        if (s === null) {
+          f = 0.72
+          size = 7
+        } else if (ci === s) {
+          f = 1.6
+          size = 13
+        } else {
+          f = 0.08
+          size = 4
+        }
+        col[p * 3] = base[0] * f
+        col[p * 3 + 1] = base[1] * f
+        col[p * 3 + 2] = base[2] * f
+        sz[p] = size
       }
+      colAttr.needsUpdate = true
+      sizeAttr.needsUpdate = true
+      desiredTarget.copy(s === null ? new THREE.Vector3(0, 0, 0) : centroids[s])
     }
+    applyRef.current = applyHighlight
+    applyHighlight(null)
+
+    // ---- click a region -> select its section ----
+    const raycaster = new THREE.Raycaster()
+    raycaster.params.Points = { threshold: 3.2 }
+    const ptr = new THREE.Vector2()
+    const dom = renderer.domElement
+    dom.style.cursor = 'grab'
 
     function onClick(e: PointerEvent): void {
-      setPointer(e)
-      const hit = pick()
-      if (hit) {
-        const u = hit.userData as Selected
-        setSelected({ ...u })
+      const rect = dom.getBoundingClientRect()
+      ptr.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      ptr.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+      raycaster.setFromCamera(ptr, camera)
+      const hits = raycaster.intersectObject(points, false)
+      if (hits.length && hits[0].index != null) {
+        const ci = pointCat[hits[0].index]
+        setSel((prev) => (prev === ci ? null : ci))
       }
     }
-
-    dom.addEventListener('pointermove', onMove)
     dom.addEventListener('pointerdown', onClick)
-    dom.style.cursor = 'grab'
 
     // ---- resize ----
     function resize(): void {
-      const w = mount!.clientWidth
-      const h = mount!.clientHeight
+      const w = stage!.clientWidth
+      const h = stage!.clientHeight
       if (!w || !h) return
       camera.aspect = w / h
       camera.updateProjectionMatrix()
@@ -235,12 +238,12 @@ function BrainSection(): JSX.Element {
     }
     resize()
     const ro = new ResizeObserver(resize)
-    ro.observe(mount)
+    ro.observe(stage)
 
-    // ---- loop ----
     let raf = 0
     function animate(): void {
       raf = requestAnimationFrame(animate)
+      controls.target.lerp(desiredTarget, 0.06)
       controls.update()
       renderer.render(scene, camera)
     }
@@ -249,52 +252,65 @@ function BrainSection(): JSX.Element {
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
-      dom.removeEventListener('pointermove', onMove)
       dom.removeEventListener('pointerdown', onClick)
       controls.dispose()
       renderer.dispose()
-      sphereGeo.dispose()
-      edgeGeo.dispose()
-      glowTex.dispose()
+      geo.dispose()
+      mat.dispose()
+      frame.geometry.dispose()
+      ;(frame.material as THREE.Material).dispose()
       if (dom.parentNode) dom.parentNode.removeChild(dom)
     }
   }, [])
 
-  const nodeCount = brain.categories.reduce((n, c) => n + c.nodes.length, 0)
+  const nodeCount = cats.reduce((n, c) => n + c.nodes.length, 0)
 
   return (
-    <div className="brain-wrap" ref={mountRef}>
-      <div className="brain-head">
-        <div className="brain-title">THEO · brain</div>
-        <div className="brain-stat">
-          {nodeCount} axioms · {brain.categories.length} clusters · identity v
-          {brain.identity_version}
-        </div>
-      </div>
-      <div className="brain-hint">drag to rotate · scroll to zoom · click a node</div>
-
-      {selected && (
-        <div className="brain-panel">
-          <button className="brain-close" onClick={() => setSelected(null)} aria-label="Close">
-            ×
-          </button>
-          <div className="brain-panel-cat">
-            <span className="brain-dot" style={{ background: selected.color }} />
-            {selected.category}
-            {selected.kind === 'hub' && selected.count != null && (
-              <span className="brain-panel-count"> · {selected.count} axioms</span>
-            )}
+    <div className="brain-wrap">
+      <aside className="brain-sections">
+        <div className="brain-sections-head">
+          <div className="brain-title">THEO · brain</div>
+          <div className="brain-stat">
+            {nodeCount} nodes · {N} sections · v{brain.identity_version}
           </div>
-          <div className="brain-panel-title">{selected.label}</div>
-          {selected.body ? (
-            <div className="brain-panel-body">{selected.body}</div>
-          ) : (
-            <div className="brain-panel-body dim">
-              Cluster hub — click an individual node to read its axiom.
-            </div>
-          )}
+          <button
+            className={`brain-all${sel === null ? ' active' : ''}`}
+            onClick={() => setSel(null)}
+          >
+            ◯ Show whole brain
+          </button>
         </div>
-      )}
+        <div className="brain-sec-list">
+          {cats.map((cat, i) => (
+            <div key={cat.id}>
+              <button
+                className={`brain-sec-row${sel === i ? ' active' : ''}`}
+                onClick={() => setSel(sel === i ? null : i)}
+              >
+                <span className="brain-dot" style={{ background: catCss(i, N) }} />
+                <span className="brain-sec-label">
+                  {isTool(cat.id) && <span className="brain-sec-pre">tool · </span>}
+                  {cleanLabel(cat.label)}
+                </span>
+                <span className="brain-sec-count">{cat.nodes.length}</span>
+              </button>
+              {sel === i && (
+                <ul className="brain-items">
+                  {cat.nodes.map((node) => (
+                    <li key={node.id} className="brain-item">
+                      {node.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      <div className="brain-stage" ref={stageRef}>
+        <div className="brain-hint">drag to rotate · scroll to zoom · click a region or a section</div>
+      </div>
     </div>
   )
 }
