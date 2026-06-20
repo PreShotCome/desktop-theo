@@ -82,6 +82,42 @@ pick the install dir; creates a desktop shortcut).
 > `npm run build` (the renderer/main bundling step) is cross-platform and runs
 > anywhere; only the final `electron-builder --win` packaging needs Windows.
 
+## Auto-update
+
+The app updates itself via `electron-updater`, reading from a dedicated Firebase
+Hosting site (no GitHub token needed — it's a public static feed). On launch and
+every 6h it checks for a newer version, downloads in the background, and installs
+on quit.
+
+### One-time setup (per machine that publishes releases)
+
+```sh
+npm i -g firebase-tools          # or use npx
+firebase login
+firebase hosting:sites:create theo-desktop-updates
+```
+
+That creates `https://theo-desktop-updates.web.app`. If the name is taken, pick
+another and update it in **two** places: `publish.url` in `electron-builder.yml`
+and the `updates` target in `.firebaserc`. The target mapping
+(`updates` → `theo-desktop-updates`) is already wired in `.firebaserc`.
+
+> The **first** installed build must already include this publish config (it
+> does, from this version on). Install it once manually; every later version
+> auto-updates.
+
+### Cutting a release
+
+```sh
+npm version patch          # bump the version (updater compares versions)
+npm run release            # build installer + latest.yml, stage to release/
+npm run deploy:update      # firebase deploy --only hosting:updates
+```
+
+Installed apps pick it up on their next launch. `release/` holds only the three
+files the updater needs (`latest.yml`, the `.exe`, and the `.blockmap` for small
+differential downloads) — not the whole `dist/` tree.
+
 ## Security posture
 
 `nodeIntegration: false`, `contextIsolation: true`. The renderer can only reach
@@ -90,7 +126,8 @@ the main process through the audited `window.theo` surface defined in
 
 ## Roadmap
 
-1. **Shell** — installable app with the four sections. ← you are here
-2. **Bridge client** — Settings → connect Chat to the running Theo bridge.
-3. **Brain** — render `brain.json` (categories → axioms).
-4. **Code** — Monaco editor + Theo's coding tools (file / shell / git).
+1. ✅ **Shell** — installable Windows app, four sections, Modern Glass UI.
+2. ✅ **Chat** — live threaded chat via Firestore (shared with the phone).
+3. ✅ **Brain** — 3D holographic point cloud with section→region highlighting.
+4. ✅ **Auto-update** — self-updating via Firebase Hosting feed.
+5. **Code** — Monaco editor + Theo's coding tools (file / shell / git). ← next

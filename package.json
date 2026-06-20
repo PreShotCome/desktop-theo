@@ -10,11 +10,14 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "build:win": "electron-vite build && electron-builder --win",
+    "release": "electron-vite build && electron-builder --win --publish never && node scripts/stage-release.mjs",
+    "deploy:update": "firebase deploy --only hosting:updates",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "firebase": "^11.10.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -1,6 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { promises as fs } from 'fs'
+import { initAutoUpdate } from './updater'
 
 // ---------------------------------------------------------------------------
 // Settings persistence
@@ -77,6 +78,7 @@ app.whenReady().then(() => {
   ipcMain.handle('settings:set', (_event, data: Settings) => writeSettings(data))
 
   createWindow()
+  initAutoUpdate()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -1,0 +1,13 @@
+{
+  "hosting": {
+    "target": "updates",
+    "public": "release",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "**/*.@(exe|yml|blockmap)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache, max-age=0" }]
+      }
+    ]
+  }
+}
