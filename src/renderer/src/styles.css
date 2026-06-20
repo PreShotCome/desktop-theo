@@ -80,6 +80,31 @@ textarea,
   border-radius: 18px;
   box-shadow: var(--shadow);
   overflow: hidden;
+  transition: width 0.16s ease;
+}
+
+/* collapsed: icons-only rail */
+.sidebar.collapsed {
+  width: 64px;
+}
+
+.sidebar.collapsed .brand {
+  padding: 22px 0 18px;
+  text-align: center;
+}
+
+.sidebar.collapsed .brand-name {
+  margin: 0 auto;
+}
+
+.sidebar.collapsed .nav {
+  padding: 12px 8px;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 11px 0;
+  gap: 0;
 }
 
 .brand {
@@ -188,6 +213,23 @@ textarea,
   padding: 0 26px;
   border-bottom: 1px solid var(--border);
   background: var(--glass-strong);
+}
+
+.topbar-toggle {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  margin-right: 14px;
+  padding: 5px 9px;
+  border-radius: 8px;
+}
+
+.topbar-toggle:hover {
+  background: var(--glass-hover);
+  color: var(--text);
 }
 
 .topbar h1 {

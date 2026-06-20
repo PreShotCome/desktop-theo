@@ -15,12 +15,21 @@ const TITLES: Record<Section, string> = {
 
 function App(): JSX.Element {
   const [section, setSection] = useState<Section>('chat')
+  const [navCollapsed, setNavCollapsed] = useState(false)
 
   return (
     <div className="app">
-      <Sidebar active={section} onSelect={setSection} />
+      <Sidebar active={section} onSelect={setSection} collapsed={navCollapsed} />
       <div className="content">
         <div className="topbar">
+          <button
+            className="topbar-toggle"
+            onClick={() => setNavCollapsed((c) => !c)}
+            title="Toggle menu"
+            aria-label="Toggle menu"
+          >
+            ☰
+          </button>
           <h1>{TITLES[section]}</h1>
         </div>
         {section === 'chat' && <ChatSection />}

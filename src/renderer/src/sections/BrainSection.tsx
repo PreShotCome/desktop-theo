@@ -19,6 +19,13 @@ function catCss(i: number, n: number): string {
   return `rgb(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])})`
 }
 
+function hexToRgb01(hex: string): [number, number, number] {
+  const h = hex.replace('#', '')
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
+  const n = parseInt(full, 16)
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]
+}
+
 function mulberry32(seed: number): () => number {
   return function () {
     seed |= 0
@@ -44,7 +51,15 @@ function cleanLabel(label: string): string {
 }
 
 // Meaningful super-groups, each mapped to a region of the brain.
-type GroupKey = 'core' | 'principles' | 'voice' | 'skills' | 'research' | 'memory' | 'tools'
+type GroupKey =
+  | 'core'
+  | 'principles'
+  | 'voice'
+  | 'skills'
+  | 'research'
+  | 'memory'
+  | 'emotions'
+  | 'tools'
 function groupOf(id: string): GroupKey {
   if (id === 'core') return 'core'
   if (id === 'principles') return 'principles'
@@ -52,6 +67,7 @@ function groupOf(id: string): GroupKey {
   if (id === 'skills') return 'skills'
   if (id === 'research') return 'research'
   if (id === 'memory') return 'memory'
+  if (id === 'emotions') return 'emotions'
   return 'tools'
 }
 // Anchor direction in normalized ellipsoid space (x=L/R, y=front/back, z=up/down).
@@ -62,6 +78,7 @@ const ANCHOR: Record<GroupKey, THREE.Vector3> = {
   skills: new THREE.Vector3(0.2, 0.66, 0.18),
   memory: new THREE.Vector3(0.0, -0.32, -0.56),
   research: new THREE.Vector3(-0.18, -0.66, 0.12),
+  emotions: new THREE.Vector3(0.06, 0.0, -0.26), // central/limbic-ish
   tools: new THREE.Vector3(0.58, -0.04, 0.0)
 }
 const GSPREAD: Record<GroupKey, number> = {
@@ -71,6 +88,7 @@ const GSPREAD: Record<GroupKey, number> = {
   skills: 0.2,
   memory: 0.18,
   research: 0.24,
+  emotions: 0.18,
   tools: 0.5
 }
 
@@ -151,9 +169,10 @@ function BrainSection(): JSX.Element {
     const centroids: THREE.Vector3[] = []
     const positions: number[] = []
     const colors: number[] = []
+    const baseColors: number[] = []
     const sizes: number[] = []
     const pointCat: number[] = []
-    const cat01 = cats.map((_, i) => catRGB(i, N).map((v) => v / 255) as number[])
+    const catFallback = cats.map((_, i) => catRGB(i, N).map((v) => v / 255) as number[])
 
     cats.forEach((cat, i) => {
       const g = groupOf(cat.id)
@@ -167,19 +186,23 @@ function BrainSection(): JSX.Element {
 
       const rng = mulberry32(i * 2654435761 + 11)
       const spread = 6 + Math.min(cat.nodes.length, 16) * 0.6
-      cat.nodes.forEach(() => {
+      cat.nodes.forEach((node) => {
         const off = new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5)
           .normalize()
           .multiplyScalar(spread * (0.4 + rng() * 0.8))
         const p = cen.clone().add(off)
+        // emotion nodes carry their own color; everything else uses the gradient
+        const rgb = node.color ? hexToRgb01(node.color) : catFallback[i]
         positions.push(p.x, p.y, p.z)
-        colors.push(cat01[i][0], cat01[i][1], cat01[i][2])
+        baseColors.push(rgb[0], rgb[1], rgb[2])
+        colors.push(rgb[0] * 0.72, rgb[1] * 0.72, rgb[2] * 0.72)
         sizes.push(7)
         pointCat.push(i)
       })
     })
 
     const count = pointCat.length
+    const baseColorsF = new Float32Array(baseColors)
     const geo = new THREE.BufferGeometry()
     const colAttr = new THREE.Float32BufferAttribute(colors, 3)
     const sizeAttr = new THREE.Float32BufferAttribute(sizes, 1)
@@ -250,7 +273,6 @@ function BrainSection(): JSX.Element {
       const sz = sizeAttr.array as Float32Array
       for (let p = 0; p < count; p++) {
         const ci = pointCat[p]
-        const base = cat01[ci]
         let f: number
         let size: number
         if (set === null) {
@@ -263,9 +285,9 @@ function BrainSection(): JSX.Element {
           f = 0.07
           size = 4
         }
-        col[p * 3] = base[0] * f
-        col[p * 3 + 1] = base[1] * f
-        col[p * 3 + 2] = base[2] * f
+        col[p * 3] = baseColorsF[p * 3] * f
+        col[p * 3 + 1] = baseColorsF[p * 3 + 1] * f
+        col[p * 3 + 2] = baseColorsF[p * 3 + 2] * f
         sz[p] = size
       }
       colAttr.needsUpdate = true
@@ -372,7 +394,13 @@ function BrainSection(): JSX.Element {
                   className={`brain-sec-row${isSecActive(it.index) ? ' active' : ''}`}
                   onClick={() => selSection(it.index)}
                 >
-                  <span className="brain-dot" style={{ background: catCss(it.index, N) }} />
+                  <span
+                    className="brain-dot"
+                    style={{
+                      background:
+                        cats[it.index].id === 'emotions' ? '#E8B84B' : catCss(it.index, N)
+                    }}
+                  />
                   <span className="brain-sec-label">{cats[it.index].label}</span>
                   <span className="brain-sec-count">{cats[it.index].nodes.length}</span>
                 </button>
