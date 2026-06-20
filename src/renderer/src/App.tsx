@@ -19,7 +19,7 @@ function App(): JSX.Element {
 
   return (
     <div className="app">
-      <Sidebar active={section} onSelect={setSection} collapsed={navCollapsed} />
+      {!navCollapsed && <Sidebar active={section} onSelect={setSection} />}
       <div className="content">
         <div className="topbar">
           <button

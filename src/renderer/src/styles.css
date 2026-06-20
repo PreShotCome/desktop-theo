@@ -80,31 +80,6 @@ textarea,
   border-radius: 18px;
   box-shadow: var(--shadow);
   overflow: hidden;
-  transition: width 0.16s ease;
-}
-
-/* collapsed: icons-only rail */
-.sidebar.collapsed {
-  width: 64px;
-}
-
-.sidebar.collapsed .brand {
-  padding: 22px 0 18px;
-  text-align: center;
-}
-
-.sidebar.collapsed .brand-name {
-  margin: 0 auto;
-}
-
-.sidebar.collapsed .nav {
-  padding: 12px 8px;
-}
-
-.sidebar.collapsed .nav-item {
-  justify-content: center;
-  padding: 11px 0;
-  gap: 0;
 }
 
 .brand {
