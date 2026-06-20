@@ -3,6 +3,14 @@ import { join } from 'path'
 import { promises as fs } from 'fs'
 import { initAutoUpdate } from './updater'
 
+// In dev, use a separate userData dir so a running *installed* build can't lock
+// the cache/IndexedDB this dev instance needs — that collision is what causes
+// the "Unable to move the cache: Access is denied" + quota_database errors when
+// both run at once. The installed app keeps the default "theo-desktop" folder.
+if (!app.isPackaged) {
+  app.setPath('userData', join(app.getPath('appData'), 'theo-desktop-dev'))
+}
+
 // ---------------------------------------------------------------------------
 // Settings persistence
 // Stored as a single JSON file under the OS user-data dir so it survives
