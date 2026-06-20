@@ -11,7 +11,9 @@ files:
 win:
   target:
     - nsis
-  artifactName: ${productName}-${version}-setup.${ext}
+  # No spaces in the artifact name — GitHub mangles spaces in release asset
+  # names, which breaks updater filename matching. ${name} = "theo-desktop".
+  artifactName: ${name}-${version}-setup.${ext}
 nsis:
   oneClick: false
   perMachine: false
