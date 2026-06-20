@@ -1,6 +1,6 @@
 {
   "name": "theo-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Theo Desktop — Windows desktop shell for Theo (Chat / Code / Brain / Settings)",
   "author": "PreShotCome",
   "license": "UNLICENSED",
@@ -10,8 +10,7 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "build:win": "electron-vite build && electron-builder --win",
-    "release": "electron-vite build && electron-builder --win --publish never && node scripts/stage-release.mjs",
-    "deploy:update": "firebase deploy --only hosting:updates",
+    "release": "electron-vite build && electron-builder --win --publish always",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web"

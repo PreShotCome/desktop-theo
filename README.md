@@ -84,39 +84,36 @@ pick the install dir; creates a desktop shortcut).
 
 ## Auto-update
 
-The app updates itself via `electron-updater`, reading from a dedicated Firebase
-Hosting site (no GitHub token needed — it's a public static feed). On launch and
-every 6h it checks for a newer version, downloads in the background, and installs
-on quit.
+The app updates itself via `electron-updater`, reading from a **public GitHub
+releases repo** (`PreShotCome/theo-desktop-releases`). Public repo = no token
+needed at runtime; only *publishing* a release needs a token. On launch and
+every 6h the app checks for a newer version, downloads in the background, and
+installs on quit.
 
-### One-time setup (per machine that publishes releases)
+### One-time setup
 
-```sh
-npm i -g firebase-tools          # or use npx
-firebase login
-firebase hosting:sites:create theo-desktop-updates
-```
+1. Create a **public** repo `theo-desktop-releases` under `PreShotCome` (empty is
+   fine — it only holds release assets). If you use a different name, update it in
+   `electron-builder.yml` (`publish.repo`).
+2. Make a GitHub **personal access token** with write access to that repo
+   (classic: `repo` scope; or fine-grained: Contents read/write on the releases
+   repo). This is only for publishing from your PC.
 
-That creates `https://theo-desktop-updates.web.app`. If the name is taken, pick
-another and update it in **two** places: `publish.url` in `electron-builder.yml`
-and the `updates` target in `.firebaserc`. The target mapping
-(`updates` → `theo-desktop-updates`) is already wired in `.firebaserc`.
-
-> The **first** installed build must already include this publish config (it
-> does, from this version on). Install it once manually; every later version
+> The **first** installed build must include this GitHub publish config (it does,
+> from v0.1.1 on). Build + install it once manually; every later version
 > auto-updates.
 
 ### Cutting a release
 
-```sh
-npm version patch          # bump the version (updater compares versions)
-npm run release            # build installer + latest.yml, stage to release/
-npm run deploy:update      # firebase deploy --only hosting:updates
+```powershell
+$env:GH_TOKEN = "<your token>"   # PowerShell; lets electron-builder upload
+npm version patch                # bump version (updater compares versions)
+npm run release                  # builds + uploads the installer to GitHub Releases
 ```
 
-Installed apps pick it up on their next launch. `release/` holds only the three
-files the updater needs (`latest.yml`, the `.exe`, and the `.blockmap` for small
-differential downloads) — not the whole `dist/` tree.
+`npm run release` runs `electron-builder --win --publish always`, which creates
+the GitHub release and uploads `latest.yml`, the `.exe`, and the `.blockmap`
+(small differential downloads). Installed apps pick it up on their next launch.
 
 ## Security posture
 

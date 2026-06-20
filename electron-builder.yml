@@ -19,8 +19,11 @@ nsis:
   shortcutName: ${productName}
   createDesktopShortcut: true
 # Auto-update feed. The installed app reads app-update.yml (generated from this)
-# and polls this URL for latest.yml + the new installer. Static public host, so
-# no token is needed. Point this at your dedicated Firebase Hosting site.
+# and checks the PUBLIC releases repo for new versions — no token needed at
+# runtime because the repo is public. Publishing (upload) needs a GH token; the
+# app's download path does not.
 publish:
-  - provider: generic
-    url: https://theo-desktop-updates.web.app
+  - provider: github
+    owner: PreShotCome
+    repo: theo-desktop-releases
+    releaseType: release
