@@ -17,10 +17,25 @@ coding tools, and brain explorer get wired in afterward.
 
 ## Sections (current shell)
 
-- **Chat** — message UI, ready to connect to the Theo bridge.
+- **Chat** — **live.** Messages sync through Firebase (project `data-55089`) to
+  the bridge running on your PC, which answers as the one shared Theo. Same
+  store the phone/PWA use, so history is shared across devices.
 - **Code** — scratch buffer today; Monaco editor + agent file/shell/git tools later.
-- **Brain** — explorer for identity/memory (IDENTITY.md, `brain.json`).
+- **Brain** — 3D holographic point cloud generated from `brain.json`; click a
+  section to light up its region and list its items.
 - **Settings** — bridge URL/token + backend choice, persisted to disk.
+
+## Chat prerequisites
+
+Chat talks to Firestore directly (the bridge architecture, same as the Flutter
+app — no HTTP endpoint). For Theo to answer:
+
+1. The bridge must be running on the PC: `./bridge.ps1` in the Tech-Support repo.
+2. The desktop app signs in to Firebase anonymously on launch (rules allow any
+   authenticated client; Ian is the only user).
+
+If you're offline or the bridge is down, you can still send — messages queue and
+Theo answers once the bridge is back.
 
 ## Layout
 
