@@ -364,6 +364,126 @@ button.btn:disabled {
   }
 }
 
+/* ---- chat threads ------------------------------------------------------ */
+
+.chat-wrap {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.chat-threads {
+  width: 244px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  min-height: 0;
+}
+
+.chat-new {
+  margin: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-bright);
+  background: var(--accent-grad-soft);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.chat-new:hover {
+  filter: brightness(1.1);
+}
+
+.chat-new:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chat-thread-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+}
+
+.chat-thread {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.chat-thread:hover {
+  background: var(--glass-hover);
+  color: var(--text);
+}
+
+.chat-thread.active {
+  background: var(--accent-grad-soft);
+  border-color: var(--border-bright);
+  color: var(--text);
+}
+
+.chat-thread-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-thread-title {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-thread-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.chat-thread-del {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 16px;
+}
+
+.chat-thread-del:hover {
+  background: var(--glass-hover);
+  color: var(--danger);
+}
+
+.chat-threads-empty {
+  padding: 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.chat {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ---- forms / inputs ---------------------------------------------------- */
 
 input[type='text'],

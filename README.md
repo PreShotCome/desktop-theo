@@ -17,9 +17,10 @@ coding tools, and brain explorer get wired in afterward.
 
 ## Sections (current shell)
 
-- **Chat** — **live.** Messages sync through Firebase (project `data-55089`) to
-  the bridge running on your PC, which answers as the one shared Theo. Same
-  store the phone/PWA use, so history is shared across devices.
+- **Chat** — **live.** Threaded conversations in Firebase (project `data-55089`,
+  `conversations/{id}/messages/`) — the *same* threads the phone/PWA use, so
+  history is shared across devices. The bridge on your PC answers as the one
+  shared Theo. Auto-opens the most recent thread; New chat + delete supported.
 - **Code** — scratch buffer today; Monaco editor + agent file/shell/git tools later.
 - **Brain** — 3D holographic point cloud generated from `brain.json`; click a
   section to light up its region and list its items.
