@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 
 interface SettingsShape {
+  techSupportDir: string
   bridgeUrl: string
   bridgeToken: string
   backend: 'auto' | 'ollama' | 'claude'
 }
 
 const DEFAULTS: SettingsShape = {
+  techSupportDir: '',
   bridgeUrl: '',
   bridgeToken: '',
   backend: 'auto'
@@ -39,9 +41,20 @@ function SettingsSection(): JSX.Element {
       <div className="placeholder">
         <h2>Settings</h2>
         <p>
-          Where the desktop app finds Theo. These persist to disk and will feed
-          the bridge client once chat is connected.
+          Where the desktop app finds Theo. The app auto-launches the backend
+          (Ollama + bridge) from the Tech-Support folder on startup — no manual
+          bridge.ps1. Changing the folder takes effect on the next launch.
         </p>
+      </div>
+
+      <div className="field">
+        <label>Tech-Support folder</label>
+        <input
+          type="text"
+          placeholder="C:\src\Tech-Support"
+          value={form.techSupportDir}
+          onChange={(e) => update('techSupportDir', e.target.value)}
+        />
       </div>
 
       <div className="field">

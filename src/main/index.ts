@@ -1,6 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { promises as fs } from 'fs'
+import { spawn, execFile, type ChildProcess } from 'child_process'
 import { initAutoUpdate } from './updater'
 
 // In dev, use a separate userData dir so a running *installed* build can't lock
@@ -36,6 +37,54 @@ async function readSettings(): Promise<Settings> {
 async function writeSettings(data: Settings): Promise<Settings> {
   await fs.writeFile(settingsPath(), JSON.stringify(data, null, 2), 'utf-8')
   return data
+}
+
+// ---------------------------------------------------------------------------
+// Theo backend lifecycle
+// Spawn the Tech-Support backend (theo-backend.ps1: Ollama + Script Bot +
+// conversational bridge, headless) when the app starts, and tear it down on
+// quit — so the user never runs bridge.ps1 by hand. Windows-only; no-op
+// elsewhere. The folder is resolved from THEO_TECHSUPPORT_DIR, then the saved
+// setting, then a sensible default.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_TECH_SUPPORT_DIR = 'C:\\src\\Tech-Support'
+
+let backend: ChildProcess | null = null
+
+function resolveTechSupportDir(settings: Settings): string {
+  const envDir = process.env['THEO_TECHSUPPORT_DIR']
+  if (envDir) return envDir
+  const setDir = settings.techSupportDir
+  if (typeof setDir === 'string' && setDir.trim()) return setDir.trim()
+  return DEFAULT_TECH_SUPPORT_DIR
+}
+
+function startBackend(techSupportDir: string): void {
+  if (process.platform !== 'win32') return
+  if (backend) return // already running
+  const script = join(techSupportDir, 'theo-backend.ps1')
+  backend = spawn(
+    'powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script],
+    { cwd: techSupportDir, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
+  )
+  backend.stdout?.on('data', (d) => console.log('[theo-backend]', d.toString().trim()))
+  backend.stderr?.on('data', (d) => console.error('[theo-backend]', d.toString().trim()))
+  backend.on('exit', (code) => {
+    console.log('[theo-backend] exited', code)
+    backend = null
+  })
+  backend.on('error', (e) => console.error('[theo-backend] spawn failed', e))
+}
+
+function stopBackend(): void {
+  if (backend?.pid) {
+    // taskkill /T kills the whole tree (powershell -> python/ollama); a plain
+    // kill() would orphan the python processes.
+    execFile('taskkill', ['/PID', String(backend.pid), '/T', '/F'])
+    backend = null
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -80,18 +129,24 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   ipcMain.handle('app:getVersion', () => app.getVersion())
   ipcMain.handle('settings:get', () => readSettings())
   ipcMain.handle('settings:set', (_event, data: Settings) => writeSettings(data))
 
+  const settings = await readSettings()
+
   createWindow()
   initAutoUpdate()
+  startBackend(resolveTechSupportDir(settings))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+// Tear the backend down on quit so python/ollama don't linger.
+app.on('before-quit', stopBackend)
 
 // Windows-only target, but keep the standard cross-platform quit guard.
 app.on('window-all-closed', () => {
