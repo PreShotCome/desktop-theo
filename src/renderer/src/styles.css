@@ -214,6 +214,46 @@ textarea,
   margin: 0;
 }
 
+.backend-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 11px;
+  letter-spacing: 0.3px;
+  user-select: none;
+}
+
+.backend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.backend-pill.online {
+  color: var(--text);
+}
+
+.backend-pill.online .backend-dot {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.backend-pill.starting .backend-dot {
+  background: var(--warn);
+  animation: theo-blink 1.2s infinite ease-in-out;
+}
+
+.backend-pill.error .backend-dot {
+  background: var(--danger);
+}
+
 .section {
   flex: 1;
   overflow-y: auto;

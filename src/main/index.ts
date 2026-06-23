@@ -50,7 +50,14 @@ async function writeSettings(data: Settings): Promise<Settings> {
 
 const DEFAULT_TECH_SUPPORT_DIR = 'C:\\src\\Tech-Support'
 
+type BackendStatus = 'starting' | 'online' | 'stopped' | 'error' | 'unsupported'
+let backendStatus: BackendStatus = 'stopped'
 let backend: ChildProcess | null = null
+
+function setBackendStatus(s: BackendStatus): void {
+  backendStatus = s
+  mainWindow?.webContents.send('backend:status', s)
+}
 
 function resolveTechSupportDir(settings: Settings): string {
   const envDir = process.env['THEO_TECHSUPPORT_DIR']
@@ -61,21 +68,34 @@ function resolveTechSupportDir(settings: Settings): string {
 }
 
 function startBackend(techSupportDir: string): void {
-  if (process.platform !== 'win32') return
+  if (process.platform !== 'win32') {
+    setBackendStatus('unsupported')
+    return
+  }
   if (backend) return // already running
   const script = join(techSupportDir, 'theo-backend.ps1')
+  setBackendStatus('starting')
   backend = spawn(
     'powershell.exe',
     ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script],
     { cwd: techSupportDir, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
   )
-  backend.stdout?.on('data', (d) => console.log('[theo-backend]', d.toString().trim()))
+  backend.stdout?.on('data', (d) => {
+    const line = d.toString().trim()
+    console.log('[theo-backend]', line)
+    // The conversational bridge prints this once it's ready for messages.
+    if (/Listening on collection_group/i.test(line)) setBackendStatus('online')
+  })
   backend.stderr?.on('data', (d) => console.error('[theo-backend]', d.toString().trim()))
   backend.on('exit', (code) => {
     console.log('[theo-backend] exited', code)
     backend = null
+    setBackendStatus('stopped')
   })
-  backend.on('error', (e) => console.error('[theo-backend] spawn failed', e))
+  backend.on('error', (e) => {
+    console.error('[theo-backend] spawn failed', e)
+    setBackendStatus('error')
+  })
 }
 
 function stopBackend(): void {
@@ -133,6 +153,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('app:getVersion', () => app.getVersion())
   ipcMain.handle('settings:get', () => readSettings())
   ipcMain.handle('settings:set', (_event, data: Settings) => writeSettings(data))
+  ipcMain.handle('backend:getStatus', () => backendStatus)
 
   const settings = await readSettings()
 

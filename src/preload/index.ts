@@ -7,7 +7,13 @@ const api = {
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
   getSettings: (): Promise<Record<string, unknown>> => ipcRenderer.invoke('settings:get'),
   setSettings: (data: Record<string, unknown>): Promise<Record<string, unknown>> =>
-    ipcRenderer.invoke('settings:set', data)
+    ipcRenderer.invoke('settings:set', data),
+  getBackendStatus: (): Promise<string> => ipcRenderer.invoke('backend:getStatus'),
+  onBackendStatus: (cb: (status: string) => void): (() => void) => {
+    const listener = (_e: unknown, status: string): void => cb(status)
+    ipcRenderer.on('backend:status', listener)
+    return () => ipcRenderer.removeListener('backend:status', listener)
+  }
 }
 
 export type TheoApi = typeof api

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Section } from './theme'
 import Sidebar from './components/Sidebar'
 import ChatSection from './sections/ChatSection'
@@ -11,6 +11,30 @@ const TITLES: Record<Section, string> = {
   code: 'Code',
   brain: 'Brain',
   settings: 'Settings'
+}
+
+const BACKEND_LABEL: Record<string, string> = {
+  starting: 'starting…',
+  online: 'online',
+  stopped: 'offline',
+  error: 'error',
+  unsupported: 'n/a'
+}
+
+// Live status of the Theo backend the main process spawns, fed by
+// theo-backend.ps1's stdout.
+function BackendPill(): JSX.Element {
+  const [status, setStatus] = useState('stopped')
+  useEffect(() => {
+    void window.theo.getBackendStatus().then(setStatus)
+    return window.theo.onBackendStatus(setStatus)
+  }, [])
+  return (
+    <span className={`backend-pill ${status}`} title={`Theo backend: ${status}`}>
+      <span className="backend-dot" />
+      Theo {BACKEND_LABEL[status] ?? status}
+    </span>
+  )
 }
 
 function App(): JSX.Element {
@@ -31,6 +55,7 @@ function App(): JSX.Element {
             ☰
           </button>
           <h1>{TITLES[section]}</h1>
+          <BackendPill />
         </div>
         {section === 'chat' && <ChatSection />}
         {section === 'code' && <CodeSection />}
