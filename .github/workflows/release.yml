@@ -1,0 +1,38 @@
+name: release
+
+# Build the Windows installer in CI and publish it to the public releases repo
+# (PreShotCome/theo-desktop-releases), so releases no longer require building on
+# anyone's machine. Installed apps then auto-update from the published release.
+#
+# Trigger from the Actions tab: "release" -> "Run workflow" -> type the version.
+# One-time setup: add a repo secret RELEASES_TOKEN = a GitHub token with
+# Contents: write on theo-desktop-releases (classic `repo`, or fine-grained).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 0.1.4'
+        required: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set version
+        run: npm version ${{ inputs.version }} --no-git-tag-version --allow-same-version
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build + publish installer
+        run: npm run release
+        env:
+          # electron-builder reads GH_TOKEN to upload to the releases repo.
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
