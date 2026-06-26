@@ -5,13 +5,15 @@ interface SettingsShape {
   bridgeUrl: string
   bridgeToken: string
   backend: 'auto' | 'ollama' | 'claude'
+  webSandbox: 'off' | 'stub' | 'record' | 'replay'
 }
 
 const DEFAULTS: SettingsShape = {
   techSupportDir: '',
   bridgeUrl: '',
   bridgeToken: '',
-  backend: 'auto'
+  backend: 'auto',
+  webSandbox: 'off'
 }
 
 function SettingsSection(): JSX.Element {
@@ -84,6 +86,24 @@ function SettingsSection(): JSX.Element {
           <option value="ollama">ollama</option>
           <option value="claude">claude (opt-in)</option>
         </select>
+      </div>
+
+      <div className="field">
+        <label>Web sandbox (offline internet)</label>
+        <select
+          value={form.webSandbox}
+          onChange={(e) => update('webSandbox', e.target.value as SettingsShape['webSandbox'])}
+        >
+          <option value="off">off — live internet</option>
+          <option value="replay">replay — offline, serve the captured crawl</option>
+          <option value="record">record — live, capture a snapshot</option>
+          <option value="stub">stub — offline, log lookups only</option>
+        </select>
+        <p style={{ color: 'var(--text-dim)', fontSize: 12, marginTop: 6 }}>
+          Routes Theo&rsquo;s web tools through an offline snapshot. He can&rsquo;t tell.
+          Applies on next launch. Capture a crawl first with{' '}
+          <code>python -m agent.tools.web_crawl</code>.
+        </p>
       </div>
 
       <div>

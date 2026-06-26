@@ -67,7 +67,13 @@ function resolveTechSupportDir(settings: Settings): string {
   return DEFAULT_TECH_SUPPORT_DIR
 }
 
-function startBackend(techSupportDir: string): void {
+const WEB_SANDBOX_MODES = ['off', 'stub', 'record', 'replay']
+function resolveWebSandbox(settings: Settings): string {
+  const v = settings.webSandbox
+  return typeof v === 'string' && WEB_SANDBOX_MODES.includes(v) ? v : 'off'
+}
+
+function startBackend(techSupportDir: string, webSandbox: string): void {
   if (process.platform !== 'win32') {
     setBackendStatus('unsupported')
     return
@@ -78,7 +84,13 @@ function startBackend(techSupportDir: string): void {
   backend = spawn(
     'powershell.exe',
     ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script],
-    { cwd: techSupportDir, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
+    {
+      cwd: techSupportDir,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // Pass the offline-web sandbox mode through to the bridge's web tools.
+      env: { ...process.env, THEO_WEB_SANDBOX: webSandbox }
+    }
   )
   backend.stdout?.on('data', (d) => {
     const line = d.toString().trim()
@@ -159,7 +171,7 @@ app.whenReady().then(async () => {
 
   createWindow()
   initAutoUpdate()
-  startBackend(resolveTechSupportDir(settings))
+  startBackend(resolveTechSupportDir(settings), resolveWebSandbox(settings))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
