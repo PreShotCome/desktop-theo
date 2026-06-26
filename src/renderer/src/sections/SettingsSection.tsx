@@ -5,7 +5,7 @@ interface SettingsShape {
   bridgeUrl: string
   bridgeToken: string
   backend: 'auto' | 'ollama' | 'claude'
-  webSandbox: 'off' | 'stub' | 'record' | 'replay'
+  webSandbox: 'off' | 'stub' | 'record' | 'replay' | 'corpus'
 }
 
 const DEFAULTS: SettingsShape = {
@@ -95,6 +95,7 @@ function SettingsSection(): JSX.Element {
           onChange={(e) => update('webSandbox', e.target.value as SettingsShape['webSandbox'])}
         >
           <option value="off">off — live internet</option>
+          <option value="corpus">corpus — offline, he roams a local Kiwix snapshot</option>
           <option value="replay">replay — offline, serve the captured crawl</option>
           <option value="record">record — live, capture a snapshot</option>
           <option value="stub">stub — offline, log lookups only</option>

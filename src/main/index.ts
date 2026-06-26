@@ -67,7 +67,7 @@ function resolveTechSupportDir(settings: Settings): string {
   return DEFAULT_TECH_SUPPORT_DIR
 }
 
-const WEB_SANDBOX_MODES = ['off', 'stub', 'record', 'replay']
+const WEB_SANDBOX_MODES = ['off', 'stub', 'record', 'replay', 'corpus']
 function resolveWebSandbox(settings: Settings): string {
   const v = settings.webSandbox
   return typeof v === 'string' && WEB_SANDBOX_MODES.includes(v) ? v : 'off'
