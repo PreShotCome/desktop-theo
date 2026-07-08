@@ -155,6 +155,40 @@ app.whenReady().then(async () => {
   ipcMain.handle('settings:set', (_event, data: Settings) => writeSettings(data))
   ipcMain.handle('backend:getStatus', () => backendStatus)
 
+  // Image upload — the renderer hands us the bytes and we POST them to the
+  // bridge's local file server (python/agent/bridges/local_storage.py), which
+  // stores them and serves them back. Done in the MAIN process on purpose: the
+  // renderer is context-isolated and a direct fetch to localhost:8765 trips
+  // CORS, but Node here has no such limit. Returns the public URL (token baked
+  // into the query so Image.src can GET it); the composer drops that into the
+  // message as `![image](url)` and the bridge captions it for Theo to "see".
+  ipcMain.handle(
+    'image:upload',
+    async (_event, payload: { bytes: Uint8Array; contentType?: string }): Promise<string> => {
+      const token = 'bumhrfpo4678lwveikadn0q15tscxg2y' // shared bridge token (tailnet-only)
+      const base = 'http://localhost:8765'
+      const type = payload.contentType || 'image/jpeg'
+      const ext = type.includes('png')
+        ? 'png'
+        : type.includes('gif')
+          ? 'gif'
+          : type.includes('webp')
+            ? 'webp'
+            : 'jpg'
+      const name = `desktop_${Date.now()}_${Math.floor(Math.random() * 1e6)}.${ext}`
+      const url = `${base}/chat_images/${name}`
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': type },
+        body: Buffer.from(payload.bytes)
+      })
+      if (resp.status !== 200 && resp.status !== 201) {
+        throw new Error(`bridge image upload failed (${resp.status})`)
+      }
+      return `${url}?t=${encodeURIComponent(token)}`
+    }
+  )
+
   const settings = await readSettings()
 
   createWindow()

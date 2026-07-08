@@ -906,3 +906,31 @@ button.btn.ghost {
   background: rgba(255, 255, 255, 0.18);
   background-clip: padding-box;
 }
+
+/* ---- Chat image support: drag/drop, paste, attachments, inline images ---- */
+.chat { position: relative; }
+.chat.drag-active { outline: 2px dashed var(--accent); outline-offset: -8px; }
+.chat-drop-hint {
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
+  background: var(--glass); border: 1px solid var(--border); color: var(--text);
+  padding: 6px 12px; border-radius: 8px; font-size: 13px; pointer-events: none; z-index: 5;
+}
+.chat-attachments { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 12px 0; }
+.chat-attachment { position: relative; width: 56px; height: 56px; }
+.chat-attachment img {
+  width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);
+}
+.chat-attachment.uploading {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--glass); border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+}
+.chat-attachment-rm {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+  border: none; background: var(--danger); color: #fff; font-size: 12px; line-height: 1; cursor: pointer;
+}
+.chat-attach-btn {
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; cursor: pointer; font-size: 16px; padding: 0 10px;
+}
+.chat-attach-btn:hover:not(:disabled) { background: var(--glass); }
+.msg-img { max-width: 320px; max-height: 320px; border-radius: 8px; display: block; margin-top: 6px; }
