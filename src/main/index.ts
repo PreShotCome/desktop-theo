@@ -120,6 +120,25 @@ function stopBackend(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Bridge HTTP (python/agent/bridges/local_storage.py, on :8765)
+//
+// Reached from the MAIN process on purpose: the renderer is context-isolated
+// and a direct fetch to localhost trips CORS, but Node here has no such limit.
+// The token is the tailnet-only shared bridge token.
+// ---------------------------------------------------------------------------
+
+const BRIDGE_BASE = 'http://localhost:8765'
+const BRIDGE_TOKEN = 'bumhrfpo4678lwveikadn0q15tscxg2y'
+
+async function bridgeGetJson<T>(path: string): Promise<T> {
+  const resp = await fetch(`${BRIDGE_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${BRIDGE_TOKEN}` }
+  })
+  if (!resp.ok) throw new Error(`bridge GET ${path} failed (${resp.status})`)
+  return (await resp.json()) as T
+}
+
+// ---------------------------------------------------------------------------
 // Window
 // ---------------------------------------------------------------------------
 
@@ -174,11 +193,18 @@ app.whenReady().then(async () => {
   // CORS, but Node here has no such limit. Returns the public URL (token baked
   // into the query so Image.src can GET it); the composer drops that into the
   // message as `![image](url)` and the bridge captions it for Theo to "see".
+  // Brain tab — the association graph, and the real activation events emitted
+  // by vault_recall every time Theo actually remembers something.
+  ipcMain.handle('brain:graph', () => bridgeGetJson('/brain/graph'))
+  ipcMain.handle('brain:activity', (_event, since: number) =>
+    bridgeGetJson(`/brain/activity?since=${Math.max(0, Math.floor(since) || 0)}`)
+  )
+
   ipcMain.handle(
     'image:upload',
     async (_event, payload: { bytes: Uint8Array; contentType?: string }): Promise<string> => {
-      const token = 'bumhrfpo4678lwveikadn0q15tscxg2y' // shared bridge token (tailnet-only)
-      const base = 'http://localhost:8765'
+      const token = BRIDGE_TOKEN
+      const base = BRIDGE_BASE
       const type = payload.contentType || 'image/jpeg'
       const ext = type.includes('png')
         ? 'png'
